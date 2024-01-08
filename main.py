@@ -22,8 +22,7 @@ metadata = MetaData()
 metadata.reflect(engine)
 
 # Получаем таблицы
-accounts = Table('TgSearchAccounts', metadata, autoload=True, autoload_with=engine)
-chats = Table('TelegramChats', metadata, autoload=True, autoload_with=engine)
+info = Table('InfoForBot', metadata, autoload=True, autoload_with=engine)
 
 # Создаем бота
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -33,16 +32,16 @@ connection = engine.connect()
 
 @bot.message_handler(commands=['start'])
 def handle_start(message):
-    bot.send_message(message.chat.id, "Привет! Введите /status для получения списка всех аккаунтов.")
+    bot.send_message(message.chat.id, "Введите /status для получения списка всех аккаунтов.")
 
 
 @bot.message_handler(commands=['status'])
 def handle_status(message):
 
     # список всех аккаунтов
-    accounts_query = select(accounts)
+    accounts_query = select(info)
 
-    print(accounts_query)
+    # print(accounts_query)
 
     accounts_result = connection.execute(accounts_query)
     accounts_rows = accounts_result.fetchall()
@@ -58,24 +57,15 @@ def handle_status(message):
 def handle_text(message):
     try:
         account_id = int(message.text.split('.')[0])
-        account_query = accounts.select().where(accounts.c.id == account_id)
+        account_query = info.select().where(info.c.id == account_id)
         account_result = connection.execute(account_query)
         account_row = account_result.fetchone()
 
         if account_row:
-            bot.send_message(message.chat.id, f"*Статус аккаунта {account_row.email}:* {'Работает' if account_row.id else 'Не работает'}", parse_mode="Markdown")
-            bot.send_message(message.chat.id, f"*Список ключевых слов:* {account_row.search_words}", parse_mode="Markdown")
-
-            chats_query = chats.select().where(chats.c.owner_id == account_row.id)
-            chats_result = connection.execute(chats_query)
-            chat_rows = chats_result.fetchall()
-
-            if chat_rows:
-                bot.send_message(message.chat.id, "*Список групп:*", parse_mode="Markdown")
-                for chat in chat_rows:
-                    bot.send_message(message.chat.id, f"- {chat[3]}")
-            else:
-                bot.send_message(message.chat.id, "У аккаунта нет групп.")
+            bot.send_message(message.chat.id, f"*Статус аккаунта {account_row.email}:* {'Работает' if account_row.status else 'Не работает'}", parse_mode="Markdown")
+            bot.send_message(message.chat.id, f"*Дата последней итерации:* {account_row.last_iter_date}", parse_mode="Markdown")
+            bot.send_message(message.chat.id, f"*Список ключевых слов:* {account_row.keywords}", parse_mode="Markdown")
+            bot.send_message(message.chat.id, f"*Список группы:* {account_row.chats}", parse_mode="Markdown")
 
         else:
             bot.send_message(message.chat.id, "Аккаунт не найден.")
